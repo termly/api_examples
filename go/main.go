@@ -3,6 +3,7 @@ package main
 import (
 	termlyhttp "api.termly.io/client/http"
 	"context"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -19,7 +20,19 @@ func main() {
 	publicKey := getRequiredEnvVariable(envPublicKey)
 	privateKey := getRequiredEnvVariable(envPrivateKey)
 
-	req, err := termlyhttp.NewHttpGet(publicKey, privateKey, "authn", nil)
+	query := []struct {
+		AccountID string `json:"account_id"`
+		WebsiteID string `json:"website_id"`
+		ID        string `json:"id,omitempty"`
+	}{
+		{
+			AccountID: "acct_1234546",
+			WebsiteID: "web_12345678-dead-beef-cafe-123456789012",
+			ID:        "rpt_123456789012",
+		},
+	}
+
+	req, err := termlyhttp.NewHttpGet(publicKey, privateKey, "websites/scan_report", &query)
 	if err != nil {
 		log.Fatalf("unable to create GET request: %v", err)
 	}
@@ -34,8 +47,22 @@ func main() {
 	if err != nil {
 		log.Fatalf("Unable to hit authn endpoint - %v", err)
 	}
+	defer func() {
+		if resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
 
 	log.Println(resp.StatusCode)
+
+	if resp.Body != nil {
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			log.Fatalf("Unable to read body - %s", err)
+		}
+
+		log.Println(string(body))
+	}
 }
 
 func getRequiredEnvVariable(key string) string {
